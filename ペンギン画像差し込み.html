@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<title>ペンギン氷上ゲーム</title>
+
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background: #eef7ff;
+    font-family: system-ui;
+    overflow: hidden;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 1vh;
+    font-size: 3vh;
+    text-align: center;
+  }
+
+  /* 横画面レイアウト */
+  #layout {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  /* 左：画像エリア */
+#ice-area {
+  flex: 3;
+  position: relative;
+  overflow: hidden;
+  background: #e6f7ff;
+}
+
+/* 画像のアスペクト比を守りつつ、見切れないようにする */
+#ice-img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center center;
+}
+
+  #number-line {
+    position: relative;
+    width: 100%;
+    height: 70vh;
+  }
+
+  .cell {
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: #dff3ff;
+    border: 1px solid #9ec9e8;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0px;
+  }
+
+  .cell.penguin {
+    background: #fff3c4;
+    border-color: #f0b400;
+    box-shadow: 0 0 0 2px #f0b40066;
+  }
+
+  .cell.penguin::after {
+    content: "🐧";
+    position: absolute;
+    top: -25px;
+    font-size: 40px;
+  }
+
+  /* 右：操作パネル（2段構成でリセットが消えない） */
+  #panel {
+    flex: 1;
+    background: #fff;
+    border-left: 2px solid #ccc;
+    padding: 1vh;
+    display: flex;
+    flex-direction: column;
+    gap: 1vh;
+  }
+
+  #panel-top {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+
+  #panel-bottom {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+  }
+
+  button {
+    padding: 1vh;
+    font-size: 2vh;
+    border-radius: 6px;
+    border: 1px solid #888;
+    background: white;
+    cursor: pointer;
+    width: 100%;
+  }
+
+  #ops {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1vh;
+    justify-content: center;
+  }
+
+  #ops button {
+    width: 45%;
+    font-size: 2vh;
+  }
+
+  #status {
+    font-size: 2vh;
+    text-align: center;
+    min-height: 2em;
+  }
+
+  #hand {
+    font-size: 1.8vh;
+    text-align: center;
+  }
+
+  #setup-screen {
+    padding: 2vh;
+    font-size: 2vh;
+  }
+
+  #game-screen {
+    display: none;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>ペンギン氷上ゲーム</h1>
+
+<!-- ▼ 手札選択画面 ▼ -->
+<div id="setup-screen">
+  <h2 style="font-size:2.5vh;">使う手札カードを選んでください</h2>
+
+  <label><input type="checkbox" class="op-select" value="+"> +（足し算）</label><br>
+  <label><input type="checkbox" class="op-select" value="-"> −（引き算）</label><br>
+  <label><input type="checkbox" class="op-select" value="×"> ×（掛け算）</label><br>
+  <label><input type="checkbox" class="op-select" value="÷"> ÷（割り算）</label><br>
+  <label><input type="checkbox" class="op-select" value="^"> ^（累乗）</label><br>
+  <label><input type="checkbox" class="op-select" value="log"> log（対数）</label><br>
+
+  <p>
+    手札の枚数：
+    <input id="hand-count" type="number" value="7" min="1" max="20">
+  </p>
+
+  <button id="start-btn">ゲーム開始</button>
+</div>
+
+<!-- ▼ ゲーム画面 ▼ -->
+<div id="game-screen">
+  <div id="layout">
+
+    <!-- 左：画像エリア -->
+    <div id="ice-area">
+      <img id="ice-img" src="list_無題14.png">
+      <div id="number-line"></div>
+    </div>
+
+    <!-- 右：操作パネル -->
+    <div id="panel">
+
+      <div id="panel-top">
+        <button id="draw-btn">山札をめくる</button>
+        <div style="text-align:center; font-size:2vh;">
+          めくったカード：<span id="drawn-card">-</span>
+        </div>
+      </div>
+
+      <div id="panel-bottom">
+        <div id="ops"></div>
+        <div id="hand"></div>
+        <div id="status"></div>
+        <button id="reset-btn">リセット</button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ▼ タイル座標 ▼ */
+const pathPoints = [
+  {x:460, y:900},  /* 1 */
+  {x:500, y:1000},
+  {x:560, y:900},
+  {x:620, y:1000},
+  {x:690, y:890},  /* 5 */
+  {x:620, y:800},  
+  {x:545, y:750},
+  {x:690, y:730},
+  {x:830, y:680},
+  {x:800, y:825},  /* 10 */
+  {x:780, y:995},
+  {x:940, y:900},
+  {x:920, y:700},
+  {x:1020, y:770},
+  {x:1105, y:670},  /* 15 */
+  {x:1190, y:770},
+  {x:1105, y:910},
+  {x:1220, y:1010},
+  {x:1320, y:865},
+  {x:1320, y:670}   /* 20 */
+];
+
+
+/* ゲーム状態 */
+
+let penguinPos = null;
+const MIN_POS = 1;
+const MAX_POS = 20;
+let drawnCard = null;
+let gameOver = false;
+
+const numberLineEl = document.getElementById('number-line');
+const drawnCardEl = document.getElementById('drawn-card');
+const statusEl = document.getElementById('status');
+const opsEl = document.getElementById('ops');
+const handEl = document.getElementById('hand');
+
+const setupScreen = document.getElementById('setup-screen');
+const gameScreen = document.getElementById('game-screen');
+
+/* ▼ タイル描画（画像上） ▼ */
+function renderNumberLine() {
+  numberLineEl.innerHTML = "";
+
+  const area = document.getElementById("ice-area");
+  const w = area.clientWidth;
+  const h = area.clientHeight;
+
+  const scaleX = w / 1754;
+  const scaleY = h / 1240;
+
+  for (let i = 1; i <= 20; i++) {
+    const base = pathPoints[i-1];
+
+    const x = base.x * scaleX;
+    const y = base.y * scaleY;
+
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    if (i === penguinPos) cell.classList.add("penguin");
+    cell.textContent = i;
+
+    cell.style.left = `${x - 20}px`;
+    cell.style.top  = `${y - 20}px`;
+
+    numberLineEl.appendChild(cell);
+  }
+}
+
+/* ▼ 手札描画 ▼ */
+function renderHand() {
+  opsEl.innerHTML = "";
+  hand.forEach((op, index) => {
+    const btn = document.createElement("button");
+    btn.textContent = op;
+    btn.onclick = () => useOperation(index);
+    opsEl.appendChild(btn);
+  });
+  handEl.textContent = "残り: " + (hand.length ? hand.join(" ") : "なし");
+}
+
+/* ▼ 山札作成 ▼ */
+function createDeck() {
+  const d = [];
+  for (let i = 1; i <= 10; i++) d.push(i);
+  d.push("?");
+  return d.sort(() => Math.random() - 0.5);
+}
+
+/* ▼ 手札作成 ▼ */
+function createRandomHand(ops, count) {
+  const h = [];
+  for (let i = 0; i < count; i++) {
+    const r = Math.floor(Math.random() * ops.length);
+    h.push(ops[r]);
+  }
+  return h;
+}
+
+/* ▼ カードをめくる ▼ */
+function drawCard() {
+  if (gameOver) return;
+  if (deck.length === 0) return;
+
+  drawnCard = deck.pop();
+  drawnCardEl.textContent = drawnCard;
+
+  if (penguinPos === null) {
+    penguinPos = Math.min(20, Math.max(1, drawnCard));
+    drawnCard = null;
+    drawnCardEl.textContent = "-";
+    statusEl.textContent = `初期位置は ${penguinPos}`;
+    renderNumberLine();
+  }
+}
+
+document.getElementById("draw-btn").onclick = drawCard;
+
+/* ▼ 演算カードを使う ▼ */
+function useOperation(index) {
+  if (drawnCard === null || gameOver) return;
+
+  const op = hand[index];
+  let value = drawnCard;
+
+  let newPos = penguinPos;
+
+  switch (op) {
+    case '+': newPos = penguinPos + value; break;
+    case '-': newPos = penguinPos - value; break;
+    case '×': newPos = penguinPos * value; break;
+    case '÷': newPos = Math.round(penguinPos / value); break;
+    case '^': newPos = Math.pow(penguinPos, value); break;
+    case 'log':
+      if (value <= 1) return alert("log の底は 2 以上にしてください");
+      newPos = Math.round(Math.log(penguinPos) / Math.log(value));
+      break;
+  }
+
+  if (newPos < MIN_POS || newPos > MAX_POS) {
+    gameOver = true;
+    statusEl.textContent = `ペンギンが落ちた！(${newPos})`;
+  } else {
+    penguinPos = newPos;
+    statusEl.textContent = `ペンギンは ${penguinPos} に移動`;
+  }
+
+  hand.splice(index, 1);
+  drawnCard = null;
+  drawnCardEl.textContent = "-";
+
+  if (!gameOver && hand.length === 0) {
+    statusEl.textContent += " 手札が尽きたのでクリア！";
+    gameOver = true;
+  }
+
+  renderNumberLine();
+  renderHand();
+}
+
+/* ▼ ゲーム開始 ▼ */
+document.getElementById('start-btn').onclick = () => {
+  const selectedOps = [...document.querySelectorAll('.op-select:checked')].map(el => el.value);
+  const count = Number(document.getElementById('hand-count').value);
+
+  if (selectedOps.length === 0) {
+    alert('1種類以上選んでください。');
+    return;
+  }
+
+  deck = createDeck();
+  hand = createRandomHand(selectedOps, count);
+
+  setupScreen.style.display = 'none';
+  gameScreen.style.display = 'block';
+
+  statusEl.textContent = '「山札をめくる」からスタート';
+  renderNumberLine();
+  renderHand();
+};
+
+/* ▼ リセット ▼ */
+document.getElementById('reset-btn').onclick = () => location.reload();
+</script>
+
+</body>
+</html>
