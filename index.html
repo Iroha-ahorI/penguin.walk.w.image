@@ -311,8 +311,34 @@ function drawCard() {
   if (deck.length === 0) return;
 
   drawnCard = deck.pop();
+
+  // ▼ ？カードの場合はユーザーに数値を入力させる
+  if (drawnCard === "?") {
+    let v = prompt("好きな数を入力してください（1〜20）");
+
+    if (v === null) {
+      // キャンセルされた場合はカードを無効化
+      drawnCard = null;
+      drawnCardEl.textContent = "-";
+      statusEl.textContent = "？カードはキャンセルされました";
+      return;
+    }
+
+    v = Number(v);
+
+    if (isNaN(v) || v < 1 || v > 20) {
+      alert("1〜20 の数を入力してください");
+      drawnCard = null;
+      drawnCardEl.textContent = "-";
+      return;
+    }
+
+    drawnCard = v;
+  }
+
   drawnCardEl.textContent = drawnCard;
 
+  // ▼ 初期位置決定
   if (penguinPos === null) {
     penguinPos = Math.min(20, Math.max(1, drawnCard));
     drawnCard = null;
@@ -393,3 +419,4 @@ document.getElementById('reset-btn').onclick = () => location.reload();
 
 </body>
 </html>
+
