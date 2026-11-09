@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<title>ペンギン氷上ゲーム</title>
+<title>ペンギンウォーク</title>
 
 <style>
   body {
@@ -10,413 +10,730 @@
     padding: 0;
     background: #eef7ff;
     font-family: system-ui;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
     overflow: hidden;
   }
 
-  h1 {
-    margin: 0;
-    padding: 1vh;
-    font-size: 3vh;
-    text-align: center;
-  }
-
-  /* 横画面レイアウト */
-  #layout {
-    display: flex;
-    height: 100vh;
-    width: 100vw;
-  }
-
-  /* 左：画像エリア */
-#ice-area {
-  flex: 3;
-  position: relative;
-  overflow: hidden;
-  background: #e6f7ff;
-}
-
-/* 画像のアスペクト比を守りつつ、見切れないようにする */
-#ice-img {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%) rotate(90deg);
-  transform-origin: center center;
-}
-
-  #number-line {
+  /* 上：プレイマットコンテナ（ここに play-area を後から合わせる） */
+  #play-container {
+    flex: 1;
     position: relative;
-    width: 100%;
-    height: 70vh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
   }
 
-  .cell {
+  /* 実際の画像要素（画面の短辺にフィットさせる） */
+    #play-img {
+    width: auto;
+    height: auto;
+    max-width: 100vw;        /* 縦画面では横にフィット */
+    max-height: calc(100vh - 20vh); /* 横画面では縦にフィット（手札分を除く） */
+    object-fit: contain;
+    display: block;
+    }
+
+
+  /* 画像の実際の表示領域＝play-area（JSでサイズ・位置を決める） */
+  #play-area {
     position: absolute;
-    width: 2px;
-    height: 2px;
-    background: #dff3ff;
-    border: 1px solid #9ec9e8;
-    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  /* 画像の上に重ねるオーバーレイレイヤー */
+  #img-overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .anchor {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    background: transparent;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 999;
+  }
+
+
+  /* カードスロット（位置は JS で決める） */
+  .card-slot {
+    position: absolute;
     display: flex;
+    justify-content: center;
     align-items: center;
+  }
+
+  .card-img {
+    width: 80%;
+    height: auto;
+    object-fit: contain;
+  }
+
+  /* 下：手札エリア */
+  #hand-area {
+    height: 20vh;
+    background: #ffffff;
+    border-top: 2px solid #ccc;
+    display: flex;
     justify-content: center;
-    font-size: 0px;
-  }
-
-  .cell.penguin {
-    background: #fff3c4;
-    border-color: #f0b400;
-    box-shadow: 0 0 0 2px #f0b40066;
-  }
-
-  .cell.penguin::after {
-    content: "🐧";
-    position: absolute;
-    top: -25px;
-    font-size: 40px;
-  }
-
-  /* 右：操作パネル（2段構成でリセットが消えない） */
-  #panel {
-    flex: 1;
-    background: #fff;
-    border-left: 2px solid #ccc;
-    padding: 1vh;
-    display: flex;
-    flex-direction: column;
+    align-items: center;
     gap: 1vh;
-  }
-
-  #panel-top {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
-  }
-
-  #panel-bottom {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-evenly;
-  }
-
-  button {
     padding: 1vh;
+    overflow-x: auto;
+  }
+
+  .hand-card{
+      height:14vh;
+      width:calc(14vh * 81 / 124);
+  }
+
+  .hand-card img{
+      width:100%;
+      height:100%;
+  }
+
+    #draw-button {
+    width: calc(14vh * 81 / 124);
+    height: 14vh;
+
+    margin-left: 2vw; /* 画面横幅の2%だけ離す */
+
+    border: 2px solid #666;
+    border-radius: 8px;
+
+    background: rgba(48, 109, 241, 0.836);
+
     font-size: 2vh;
-    border-radius: 6px;
-    border: 1px solid #888;
-    background: white;
     cursor: pointer;
-    width: 100%;
+
+    flex-shrink: 0;
   }
 
-  #ops {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1vh;
-    justify-content: center;
+  #penguin{
+    position:absolute;
+    width:40px;
+    height:auto;
+    display:none;
+    pointer-events:none;
+    z-index:1000;
   }
 
-  #ops button {
-    width: 45%;
-    font-size: 2vh;
+  #q-card-panel{
+    position:absolute;
+
+    right:2vw;
+    bottom:22vh;
+
+    background:white;
+    border:2px solid #666;
+    border-radius:10px;
+
+    padding:10px;
+
+    display:none;
+
+    z-index:2000;
   }
 
-  #status {
-    font-size: 2vh;
-    text-align: center;
-    min-height: 2em;
+  #q-card-buttons{
+    display:grid;
+
+    grid-template-columns:repeat(5,1fr);
+    gap:5px;
   }
 
-  #hand {
-    font-size: 1.8vh;
-    text-align: center;
+  .q-number-button{
+    width:50px;
+    height:50px;
+
+    font-size:20px;
   }
 
-  #setup-screen {
-    padding: 2vh;
-    font-size: 2vh;
+  #game-message{
+    position:absolute;
+
+    left:50%;
+    top:50%;
+
+    transform:translate(-50%,-50%);
+
+    background:white;
+    border:4px solid #333;
+    border-radius:15px;
+
+    padding:30px;
+
+    font-size:48px;
+    font-weight:bold;
+
+    z-index:5000;
+
+    display:none;
   }
 
-  #game-screen {
-    display: none;
+  #restart-button{
+    position:absolute;
+
+    right:20px;
+    top:20px;
+
+    width:140px;
+    height:50px;
+
+    font-size:20px;
+
+    z-index:5000;
   }
+
+  @media screen and (orientation: portrait) {
+  body {
+    transform: rotate(90deg);
+    transform-origin: left top;
+    width: 100vh;
+    height: 100vw;
+    overflow: hidden;
+  }
+
+
+}
+
+
+
+
 </style>
 </head>
 
 <body>
 
-<h1>ペンギン氷上ゲーム</h1>
+<!-- ▼ プレイマットコンテナ -->
+<div id="play-container">
+  <!-- 実際の画像 -->
+  <img id="play-img" src="list_無題14.png">
 
-<!-- ▼ 手札選択画面 ▼ -->
-<div id="setup-screen">
-  <h2 style="font-size:2.5vh;">使う手札カードを選んでください</h2>
+  <!-- 画像の実際の表示領域＝play-area -->
+  <div id="play-area">
+    <!-- 画像に従属するオーバーレイ -->
+    <div id="img-overlay">
+      <!-- 左上1：伏せた山札 -->
+      <div id="deck-back" class="card-slot">
+        <img src="card_back.png" class="card-img">
+      </div>
 
-  <label><input type="checkbox" class="op-select" value="+"> +（足し算）</label><br>
-  <label><input type="checkbox" class="op-select" value="-"> −（引き算）</label><br>
-  <label><input type="checkbox" class="op-select" value="×"> ×（掛け算）</label><br>
-  <label><input type="checkbox" class="op-select" value="÷"> ÷（割り算）</label><br>
-  <label><input type="checkbox" class="op-select" value="^"> ^（累乗）</label><br>
-  <label><input type="checkbox" class="op-select" value="log"> log（対数）</label><br>
+      <!-- 左上2：めくったカード -->
+      <div id="deck-front" class="card-slot"></div>
+    </div>
+    <div id="anchors"></div>
+    <img id="penguin" src="peng.png">
+  </div>
 
-  <p>
-    手札の枚数：
-    <input id="hand-count" type="number" value="7" min="1" max="20">
-  </p>
 
-  <button id="start-btn">ゲーム開始</button>
+
 </div>
 
-<!-- ▼ ゲーム画面 ▼ -->
-<div id="game-screen">
-  <div id="layout">
+<!-- ▼ 手札 -->
+<div id="hand-area">
 
-    <!-- 左：画像エリア -->
-    <div id="ice-area">
-      <img id="ice-img" src="list_無題14.png">
-      <div id="number-line"></div>
-    </div>
+  <div class="hand-card">
+    <img src="card_p.png" class="hand-card-img">
+  </div>
 
-    <!-- 右：操作パネル -->
-    <div id="panel">
+  <div class="hand-card">
+    <img src="card_m.png" class="hand-card-img">
+  </div>
 
-      <div id="panel-top">
-        <button id="draw-btn">山札をめくる</button>
-        <div style="text-align:center; font-size:2vh;">
-          めくったカード：<span id="drawn-card">-</span>
-        </div>
-      </div>
+  <div class="hand-card">
+    <img src="card_t.png" class="hand-card-img">
+  </div>
 
-      <div id="panel-bottom">
-        <div id="ops"></div>
-        <div id="hand"></div>
-        <div id="status"></div>
-        <button id="reset-btn">リセット</button>
-      </div>
+  <div class="hand-card">
+    <img src="card_d.png" class="hand-card-img">
+  </div>
 
-    </div>
+  <button id="draw-button"></button>
 
+</div>
+
+<div id="q-card-panel">
+  <div>好きな数字を選択</div>
+
+  <div id="q-card-buttons">
   </div>
 </div>
 
 <script>
-/* ▼ タイル座標 ▼ */
-const pathPoints = [
-  {x:460, y:900},  /* 1 */
-  {x:500, y:1000},
-  {x:560, y:900},
-  {x:620, y:1000},
-  {x:690, y:890},  /* 5 */
-  {x:620, y:800},  
-  {x:545, y:750},
-  {x:690, y:730},
-  {x:830, y:680},
-  {x:800, y:825},  /* 10 */
-  {x:780, y:995},
-  {x:940, y:900},
-  {x:920, y:700},
-  {x:1020, y:770},
-  {x:1105, y:670},  /* 15 */
-  {x:1190, y:770},
-  {x:1105, y:910},
-  {x:1220, y:1010},
-  {x:1320, y:865},
-  {x:1320, y:670}   /* 20 */
+/* ▼ 画像の実際の表示領域を play-area に反映する */
+function updatePlayArea() {
+  const img = document.getElementById("play-img");
+  const container = document.getElementById("play-container");
+  const playArea = document.getElementById("play-area");
+
+  const imgRect = img.getBoundingClientRect();
+  const containerRect = container.getBoundingClientRect();
+
+  // play-area を「画像の実際の表示領域」と一致させる
+  const left = imgRect.left - containerRect.left;
+  const top  = imgRect.top  - containerRect.top;
+  const width  = imgRect.width;
+  const height = imgRect.height;
+
+  playArea.style.left   = left + "px";
+  playArea.style.top    = top + "px";
+  playArea.style.width  = width + "px";
+  playArea.style.height = height + "px";
+}
+
+/* ▼ 画像の実際の表示領域（play-area）を 8 分割する関数（縦2 × 横4） */
+function getGridPosition(col, row) {
+  const playArea = document.getElementById("play-area");
+  const areaRect = playArea.getBoundingClientRect();
+
+  const cellW = areaRect.width / 4;  // 横4分割
+  const cellH = areaRect.height / 2; // 縦2分割
+
+  return {
+    left: cellW * col,
+    top:  cellH * row,
+    width: cellW,
+    height: cellH
+  };
+}
+
+/* ▼ カードを配置する */
+function placeCards() {
+  updatePlayArea(); // まず play-area を画像に合わせる
+
+  const back = document.getElementById("deck-back");
+  const front = document.getElementById("deck-front");
+
+  // 左上1（col=0, row=0）
+  const posBack = getGridPosition(0, 0);
+  back.style.left   = posBack.left + "px";
+  back.style.top    = posBack.top + "px";
+  back.style.width  = posBack.width + "px";
+  back.style.height = posBack.height + "px";
+
+  // 左上2（col=1, row=0）
+  const posFront = getGridPosition(1, 0);
+  front.style.left   = posFront.left + "px";
+  front.style.top    = posFront.top + "px";
+  front.style.width  = posFront.width + "px";
+  front.style.height = posFront.height + "px";
+}
+
+/* ▼ 画像読み込み後に配置、リサイズ時も再配置 */
+window.addEventListener("load", placeCards);
+window.addEventListener("resize", placeCards);
+
+function checkOrientation() {
+  if (window.innerHeight > window.innerWidth) {
+    alert("横画面で遊んでください！↶");
+  }
+}
+
+window.addEventListener("load", checkOrientation);
+window.addEventListener("resize", checkOrientation);
+
+const ORIG_W = 480;
+const ORIG_H = 339;
+
+const anchorPoints = [
+  {x: 50,  y:268}, // 1
+  {x: 68,  y:311}, // 2
+  {x: 96,  y:269}, // 3
+  {x:125,  y:306}, // 4
+  {x:151,  y:264}, // 5
+  {x:119,  y:232}, // 6
+  {x: 82,  y:217}, // 7
+  {x:146,  y:206}, // 8
+  {x:206,  y:186}, // 9
+  {x:204,  y:255}, // 10
+  {x:191,  y:303}, // 11
+  {x:261,  y:275}, // 12
+  {x:250,  y:196}, // 13
+  {x:295,  y:219}, // 14
+  {x:333,  y:182}, // 15
+  {x:371,  y:224}, // 16
+  {x:330,  y:280}, // 17
+  {x:386,  y:312}, // 18
+  {x:432,  y:260}, // 19
+  {x:431,  y:178}, // 20
 ];
 
+function placeAnchors() {
+  updatePlayArea(); // 画像の実際の表示領域を更新
 
-/* ゲーム状態 */
+  const img = document.getElementById("play-img");
+  const imgRect = img.getBoundingClientRect();
 
-let penguinPos = null;
-const MIN_POS = 1;
-const MAX_POS = 20;
-let drawnCard = null;
-let gameOver = false;
+  const playArea = document.getElementById("play-area");
+  const areaRect = playArea.getBoundingClientRect();
 
-const numberLineEl = document.getElementById('number-line');
-const drawnCardEl = document.getElementById('drawn-card');
-const statusEl = document.getElementById('status');
-const opsEl = document.getElementById('ops');
-const handEl = document.getElementById('hand');
+  const anchors = document.getElementById("anchors");
+  anchors.innerHTML = "";
 
-const setupScreen = document.getElementById('setup-screen');
-const gameScreen = document.getElementById('game-screen');
+  anchorPoints.forEach((p, i) => {
+    const anchor = document.createElement("div");
+    anchor.className = "anchor";
 
-/* ▼ タイル描画（画像上） ▼ */
-function renderNumberLine() {
-  numberLineEl.innerHTML = "";
+    // 元画像 → 実際の表示サイズへの変換
+    const dispX = (p.x / ORIG_W) * imgRect.width;
+    const dispY = (p.y / ORIG_H) * imgRect.height;
 
-  const area = document.getElementById("ice-area");
-  const w = area.clientWidth;
-  const h = area.clientHeight;
+    // play-area 基準に変換
+    anchor.style.left = (dispX - 7) + "px"; // 10px はアンカー半径
+    anchor.style.top  = (dispY - 7) + "px";
 
-  const scaleX = w / 1754;
-  const scaleY = h / 1240;
+    anchor.dataset.index = i + 1;
 
-  for (let i = 1; i <= 20; i++) {
-    const base = pathPoints[i-1];
-
-    const x = base.x * scaleX;
-    const y = base.y * scaleY;
-
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    if (i === penguinPos) cell.classList.add("penguin");
-    cell.textContent = i;
-
-    cell.style.left = `${x - 20}px`;
-    cell.style.top  = `${y - 20}px`;
-
-    numberLineEl.appendChild(cell);
-  }
-}
-
-/* ▼ 手札描画 ▼ */
-function renderHand() {
-  opsEl.innerHTML = "";
-  hand.forEach((op, index) => {
-    const btn = document.createElement("button");
-    btn.textContent = op;
-    btn.onclick = () => useOperation(index);
-    opsEl.appendChild(btn);
+    anchors.appendChild(anchor);
   });
-  handEl.textContent = "残り: " + (hand.length ? hand.join(" ") : "なし");
 }
 
-/* ▼ 山札作成 ▼ */
-function createDeck() {
-  const d = [];
-  for (let i = 1; i <= 10; i++) d.push(i);
-  d.push("?");
-  return d.sort(() => Math.random() - 0.5);
-}
 
-/* ▼ 手札作成 ▼ */
-function createRandomHand(ops, count) {
-  const h = [];
-  for (let i = 0; i < count; i++) {
-    const r = Math.floor(Math.random() * ops.length);
-    h.push(ops[r]);
+  window.addEventListener("load", () => {
+    placeCards();
+    placeAnchors();
+  });
+
+  window.addEventListener("resize", () => {
+    placeCards();
+    placeAnchors();
+  });
+
+  let hand = [];
+
+  function createHand() {
+    const handDeck = [];
+
+    // p 10枚
+    for(let i = 0; i < 10; i++){
+      handDeck.push("p");
+    }
+
+    // m 10枚
+    for(let i = 0; i < 10; i++){
+      handDeck.push("m");
+    }
+
+    // t 7枚
+    for(let i = 0; i < 7; i++){
+      handDeck.push("t");
+    }
+
+    // d 7枚
+    for(let i = 0; i < 7; i++){
+      handDeck.push("d");
+    }
+
+    // シャッフル
+    handDeck.sort(() => Math.random() - 0.5);
+
+    // 先頭6枚を手札にする
+    hand = handDeck.slice(0, 6);
   }
-  return h;
-}
 
-/* ▼ カードをめくる ▼ */
-function drawCard() {
-  if (gameOver) return;
-  if (deck.length === 0) return;
+  function renderHand() {
+  const handArea = document.getElementById("hand-area");
+  
+  handArea.innerHTML = "";
+  
+  hand.forEach((card,index) =>  {
+  const div = document.createElement("div");
+  div.className = "hand-card";
+  
+  div.innerHTML =
+  `<img src="card_${card}.png" class="hand-card-img">`;
+  div.onclick = () => useCard(index);
 
-  drawnCard = deck.pop();
+  handArea.appendChild(div);
+  });
+  
+  const drawBtn = document.createElement("button");
+  drawBtn.id = "draw-button";
+  drawBtn.innerHTML = "山札を<br>めくる";
+  
+  handArea.appendChild(drawBtn);
+  drawBtn.onclick = drawCard;
 
-  // ▼ ？カードの場合はユーザーに数値を入力させる
-  if (drawnCard === "?") {
-    let v = prompt("好きな数を入力してください（1〜20）");
+  }
 
-    if (v === null) {
-      // キャンセルされた場合はカードを無効化
-      drawnCard = null;
-      drawnCardEl.textContent = "-";
-      statusEl.textContent = "？カードはキャンセルされました";
+  let deck = [];
+
+  function createDeck() {
+    deck = [];
+
+    // 1～4は4枚ずつ
+    for(let n = 1; n <= 4; n++) {
+      for(let i = 0; i < 4; i++) {
+        deck.push(n);
+      }
+    }
+
+    // 5～9は3枚ずつ
+    for(let n = 5; n <= 9; n++) {
+      for(let i = 0; i < 3; i++) {
+        deck.push(n);
+      }
+    }
+
+    // ?カード3枚
+    for(let i = 0; i < 3; i++) {
+      deck.push("q");
+    }
+
+    // シャッフル
+    deck.sort(() => Math.random() - 0.5);
+  }
+
+  let currentCard = null;
+  let penguinPos = null;
+  let gameOver = false;
+
+  function useCard(index){
+
+    if(gameOver){
       return;
     }
 
-    v = Number(v);
-
-    if (isNaN(v) || v < 1 || v > 20) {
-      alert("1〜20 の数を入力してください");
-      drawnCard = null;
-      drawnCardEl.textContent = "-";
+    if(currentCard === null){
+      alert("先に山札をめくってください");
       return;
     }
 
-    drawnCard = v;
+    const operation = hand[index];
+
+    let newPos = penguinPos;
+
+    switch(operation){
+
+      case "p":
+        newPos += Number(currentCard);
+        break;
+
+      case "m":
+        newPos -= Number(currentCard);
+        break;
+
+      case "t":
+        newPos *= Number(currentCard);
+        break;
+
+      case "d":
+        newPos = Math.round(
+          newPos / Number(currentCard)
+        );
+        break;
+    }
+
+    if(newPos < 1 || newPos > 20){
+         endGame("バッドペンギンウォーク");
+        return;
+    }
+    movePenguin(newPos);
+
+    hand.splice(index,1);
+
+    currentCard = null;
+
+    /* 手札を全て使い切った */
+    if(hand.length === 0){
+
+        endGame("グッドペンギンウォーク");
+
+        return;
+    }
+
+    renderHand();
   }
 
-  drawnCardEl.textContent = drawnCard;
+  function movePenguin(position){
 
-  // ▼ 初期位置決定
-  if (penguinPos === null) {
-    penguinPos = Math.min(20, Math.max(1, drawnCard));
-    drawnCard = null;
-    drawnCardEl.textContent = "-";
-    statusEl.textContent = `初期位置は ${penguinPos}`;
-    renderNumberLine();
-  }
-}
+    const p = anchorPoints[position - 1];
 
-document.getElementById("draw-btn").onclick = drawCard;
+    const img = document.getElementById("play-img");
+    const imgRect = img.getBoundingClientRect();
 
-/* ▼ 演算カードを使う ▼ */
-function useOperation(index) {
-  if (drawnCard === null || gameOver) return;
+    const dispX = (p.x / ORIG_W) * imgRect.width;
+    const dispY = (p.y / ORIG_H) * imgRect.height;
 
-  const op = hand[index];
-  let value = drawnCard;
+    const penguin = document.getElementById("penguin");
 
-  let newPos = penguinPos;
+    penguin.style.left = (dispX - 20) + "px";
+    penguin.style.top  = (dispY - 20) + "px";
 
-  switch (op) {
-    case '+': newPos = penguinPos + value; break;
-    case '-': newPos = penguinPos - value; break;
-    case '×': newPos = penguinPos * value; break;
-    case '÷': newPos = Math.round(penguinPos / value); break;
-    case '^': newPos = Math.pow(penguinPos, value); break;
-    case 'log':
-      if (value <= 1) return alert("log の底は 2 以上にしてください");
-      newPos = Math.round(Math.log(penguinPos) / Math.log(value));
-      break;
+    penguin.style.display = "block";
+
+    penguinPos = position;
   }
 
-  if (newPos < MIN_POS || newPos > MAX_POS) {
+  function endGame(message){
+
     gameOver = true;
-    statusEl.textContent = `ペンギンが落ちた！(${newPos})`;
-  } else {
-    penguinPos = newPos;
-    statusEl.textContent = `ペンギンは ${penguinPos} に移動`;
+
+    const msg =
+      document.getElementById("game-message");
+
+    msg.textContent = message;
+    msg.style.display = "block";
   }
 
-  hand.splice(index, 1);
-  drawnCard = null;
-  drawnCardEl.textContent = "-";
+  function applyDrawnCard(card){
 
-  if (!gameOver && hand.length === 0) {
-    statusEl.textContent += " 手札が尽きたのでクリア！";
-    gameOver = true;
+    const front =
+      document.getElementById("deck-front");
+
+    // 表向きカード表示
+    front.innerHTML =
+      `<img src="card_${card}.png" class="card-img">`;
+
+    currentCard = card;
+
+    // 初回ドローは開始位置決定
+    if(penguinPos === null){
+
+      movePenguin(card);
+
+      // 初回カードは位置決定専用
+      currentCard = null;
+    }
   }
 
-  renderNumberLine();
-  renderHand();
-}
+  function drawCard() {
 
-/* ▼ ゲーム開始 ▼ */
-document.getElementById('start-btn').onclick = () => {
-  const selectedOps = [...document.querySelectorAll('.op-select:checked')].map(el => el.value);
-  const count = Number(document.getElementById('hand-count').value);
+    const front = document.getElementById("deck-front");
+    const back = document.getElementById("deck-back");
 
-  if (selectedOps.length === 0) {
-    alert('1種類以上選んでください。');
-    return;
+    if(gameOver){
+      return;
+    }
+
+    if(deck.length === 0){
+      alert("山札がありません");
+      return;
+    }
+
+    let card = deck.pop();
+
+    if(card === "q"){
+
+      waitingQ = true;
+
+      document.getElementById(
+        "q-card-panel"
+      ).style.display = "block";
+
+      return;
+    }
+
+    applyDrawnCard(card);
   }
 
-  deck = createDeck();
-  hand = createRandomHand(selectedOps, count);
+  
+  function createQPanel(){
 
-  setupScreen.style.display = 'none';
-  gameScreen.style.display = 'block';
+    const area =
+      document.getElementById("q-card-buttons");
 
-  statusEl.textContent = '「山札をめくる」からスタート';
-  renderNumberLine();
-  renderHand();
-};
+    area.innerHTML = "";
 
-/* ▼ リセット ▼ */
-document.getElementById('reset-btn').onclick = () => location.reload();
+    for(let i=1;i<=10;i++){
+
+      const btn =
+        document.createElement("button");
+
+      btn.className =
+        "q-number-button";
+
+      btn.textContent = i;
+
+      btn.onclick = () =>{
+        selectQNumber(i);
+      };
+
+      area.appendChild(btn);
+    }
+  }
+
+  let waitingQ = false;
+
+  function selectQNumber(num){
+
+    applyDrawnCard(num);
+
+    document.getElementById("q-card-panel")
+      .style.display = "none";
+
+    waitingQ = false;
+  }
+
+  function restartGame(){
+
+    // 状態初期化
+    gameOver = false;
+    currentCard = null;
+    penguinPos = null;
+    waitingQ = false;
+
+    // ゲームメッセージ消去
+    document.getElementById("game-message")
+      .style.display = "none";
+
+    // ペンギン非表示
+    document.getElementById("penguin")
+      .style.display = "none";
+
+    // 表向きカード消去
+    document.getElementById("deck-front")
+      .innerHTML = "";
+
+    // 山札裏面復活
+    document.getElementById("deck-back")
+      .innerHTML =
+      '<img src="card_back.png" class="card-img">';
+
+    // qパネルを閉じる
+    document.getElementById("q-card-panel")
+      .style.display = "none";
+
+    // 山札・手札再生成
+    createDeck();
+    createHand();
+
+    // 描画更新
+    renderHand();
+  }
+
+
+  window.addEventListener("load", () => {
+    createDeck();
+    createHand();
+
+    createQPanel();    
+
+    placeCards();
+    placeAnchors();
+
+    renderHand();
+
+      document
+    .getElementById("restart-button")
+    .onclick = restartGame;
+  });
+
 </script>
+
+<div id="game-message"></div>
+<button id="restart-button">
+  リスタート
+</button>
 
 </body>
 </html>
-
